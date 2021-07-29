@@ -33,7 +33,7 @@ module.exports = [
     },
     {
         method: 'GET',
-        path: '/api/{anim}/',
+        path: '/api/anime/{anim}/',
         handler: handler.getAnime
     },
     {

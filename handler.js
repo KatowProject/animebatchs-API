@@ -252,61 +252,66 @@ const getGenreSeasonList = async (req, h) => {
 const getAnime = async (req, h) => {
     try {
         const reqAnime = req.params.anim
-        const res = await axios('/' + reqAnime)
+        const URL = encodeURI(reqAnime)
+        const res = await axios(URL)
         const $ = cheerio.load(res.data)
         const main = $('.container.wrapper')
 
         const anim = {}
         const info = $(main).find('.meta tbody')
 
+        const cover = $('.cover').find('noscript').text().split(" ")
+        const coverURL = cover.filter(a => a.includes('https://'))[0].split('"')[1]
+
         const genreList = []
         info.find('tr:nth-child(8) > td:nth-child(2) a').each((i, a) => {
             genreList.push({ name: $(a).text(), url: $(a).attr('href'), endpoint: $(a).attr('href').replace(baseURL, '') })
         })
 
-        const listDownload = []
-        const datas1 = $(main).find('.download .download .downloadx')
-        const datas2 = $(main).find('.download .download')
+        let listDownload = []
+        const oldThread = $(main).find('.download .downloadx')
+        const newThread = $(main).find('.download')
+        const data = oldThread.length >= 1 ? true : false
 
-        if (datas2.length == 1) {
-            $(datas2).find('.download-content .item').each((i, a) => {
+        if (data) {
+
+            //chapter name
+            $(oldThread).find('h5').each((i, a) => {
+                listDownload.push({ name: $(a).text() });
+            });
+
+            //chapter linkDownload
+            $(oldThread).find('ul').each((i, a) => {
                 const tempres = []
+                $(a).find('li').each((j, b) => {
+                    const dl = {};
+                    dl.reso = $(b).find('strong').text().trim()
 
-                $(a).find('a').each((j, b) => {
-                    const parseURL = url.parse($(b).attr('href'), true).query
-                    tempres.push({ name: $(b).text(), url: parseURL.url })
+                    const tempdl = []
+                    $(b).find('a').each((k, c) => {
+                        tempdl.push({ name: $(c).text().trim(), url: $(c).attr('href') })
+                    })
+                    dl.linkDownload = tempdl
+                    tempres.push(dl)
                 })
-
-                const info = {
-                    name: $(a).find('b').text(),
-                    linkDownload: tempres
-                }
-
-                listDownload.push(info)
+                listDownload[i].data = tempres
             })
-        } else if (datas2.length > 1) {
-            const temppart = []
-
-            $(datas2).find('.download-content').each((i, a) => {
+        } else {
+            $(newThread).find('.download-content').each((i, a) => {
                 const tempres = []
-                const title = $(a).find('h5').text() ? false : true
 
-                if (title) {
-                    $(a).find('.item').each((j, b) => {
-                        const tempdl = []
+                $(a).find('.item').each((j, b) => {
+                    const tempdl = []
 
-                        $(b).find('a').each((k, c) => {
-                            const parseURL = url.parse($(c).attr('href'), true).query
-                            tempdl.push({ name: $(c).text(), url: parseURL.url })
-                        })
-
-                        tempres.push({ reso: $(b).find('b').text(), linkDownload: tempdl })
+                    $(b).find('a').each((k, c) => {
+                        //const parseURL = url.parse($(c).attr('href'), true).query
+                        tempdl.push({ name: $(c).text(), url: $(c).attr('href') })
                     })
 
-                    listDownload.push({ name: $(datas2).find('h3').text(), data: tempres })
-                }
+                    tempres.push({ reso: $(b).find('b').text(), linkDownload: tempdl })
+                })
+                listDownload.push({ name: $(newThread).find('h3 ').text(), data: tempres })
             })
-
         }
 
         anim.judul = info.find('tr:nth-child(1) > td:nth-child(2)').text()
@@ -319,10 +324,12 @@ const getAnime = async (req, h) => {
         anim.genre = genreList
         anim.durasi = info.find('tr:nth-child(9) > td:nth-child(2)').text()
         anim.score = info.find('tr:nth-child(10) > td:nth-child(2)').text()
+        anim.thumb = coverURL
         anim.listDownload = listDownload
 
         return h.response({ success: true, timestamp: Date.now(), data: anim })
     } catch (e) {
+        console.log(e);
         return h.response({ success: false, statusCode: 504, statusMessage: e.message })
     }
 }
